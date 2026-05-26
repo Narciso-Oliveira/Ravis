@@ -253,44 +253,64 @@ if df_raw.empty:
 df_serv = df_raw[df_raw['Classificação'].isin(['Banho', 'Serviços extras'])].copy()
 
 # ============================================================
-# SIDEBAR
+# SIDEBAR / CONFIGURACOES
 # ============================================================
+meses = sorted(df_serv['Mes_Ano'].dropna().unique())
+profissionais = sorted(df_serv['Profissional'].dropna().unique())
+clientes = sorted(df_serv['Cliente'].dropna().unique())
+
+# Inicializa o estado das configuracoes
+if 'mostrar_config' not in st.session_state:
+    st.session_state['mostrar_config'] = True
+
+# Funcao do botao: abre/fecha as configuracoes
+def alternar_configuracoes():
+    st.session_state['mostrar_config'] = not st.session_state['mostrar_config']
+
+# Valores padrao quando as configuracoes estiverem fechadas
+cap_diaria = 15
+meta_banhos = 340
+meta_extras = 300
+meses_sel = meses
+tipos = ['Avulso', 'Pacote']
+prof_sel = []
+cli_sel = []
+
+# Botao sempre visivel no topo do dashboard
+col_btn_config, col_status_config, col_espaco_config = st.columns([1.4, 2.2, 4])
+with col_btn_config:
+    st.button(
+        "🔒 Fechar configurações" if st.session_state['mostrar_config'] else "⚙️ Abrir configurações",
+        key="botao_toggle_configuracoes",
+        use_container_width=True,
+        on_click=alternar_configuracoes
+    )
+
+with col_status_config:
+    if st.session_state['mostrar_config']:
+        st.caption("Configurações abertas")
+    else:
+        st.caption("Configurações fechadas")
+
+# Conteudo da sidebar
 with st.sidebar:
-    st.markdown("## 🐾 Filtros")
-    st.markdown("---")
-    
-    st.markdown("### ⚙️ Capacidade")
-    cap_diaria = st.number_input("Capacidade diaria de banhos", min_value=1, value=15, step=1)
+    st.markdown("## 🐾 Painel de Controle")
 
-    st.markdown("### 🎯 Metas mensais")
-    meta_banhos = st.number_input(
-        "Meta mensal de banhos",
-        min_value=0,
-        value=340,
-        step=10
-    )
-
-    meta_extras = st.number_input(
-        "Meta mensal de serviços extras",
-        min_value=0,
-        value=300,
-        step=10
-    )
-    
-    st.markdown("---")
-    st.markdown("### 📅 Periodo")
-    meses = sorted(df_serv['Mes_Ano'].dropna().unique())
-    meses_sel = st.multiselect("Meses", meses, default=meses)
-    
-    st.markdown("---")
-    st.markdown("### 🔍 Detalhamento")
-    tipos = st.multiselect("Tipo de Banho", ['Avulso', 'Pacote'], default=['Avulso', 'Pacote'])
-    
-    profissionais = sorted(df_serv['Profissional'].dropna().unique())
-    prof_sel = st.multiselect("Profissional", profissionais, default=[])
-    
-    clientes = sorted(df_serv['Cliente'].dropna().unique())
-    cli_sel = st.multiselect("Cliente", clientes, default=[])
+    if st.session_state['mostrar_config']:
+        with st.expander("⚙️ Capacidade e Metas", expanded=True):
+            cap_diaria = st.number_input("Capacidade diaria de banhos", min_value=1, value=15, step=1)
+            meta_banhos = st.number_input("Meta mensal de banhos", min_value=0, value=340, step=10)
+            meta_extras = st.number_input("Meta mensal de serviços extras", min_value=0, value=300, step=10)
+        
+        with st.expander("📅 Periodo", expanded=True):
+            meses_sel = st.multiselect("Meses", meses, default=meses)
+        
+        with st.expander("🔍 Detalhamento", expanded=False):
+            tipos = st.multiselect("Tipo de Banho", ['Avulso', 'Pacote'], default=['Avulso', 'Pacote'])
+            prof_sel = st.multiselect("Profissional", profissionais, default=[])
+            cli_sel = st.multiselect("Cliente", clientes, default=[])
+    else:
+        st.info("Configurações fechadas. Use o botão no topo do dashboard para abrir novamente.")
 
 # ============================================================
 # APLICAR FILTROS
@@ -361,9 +381,28 @@ pct_extras_fat = (fat_extras / fat_total * 100) if fat_total > 0 else 0
 # ============================================================
 # CABECALHO
 # ============================================================
+st.markdown("""
+<div style="
+    width:100%;
+    background: linear-gradient(135deg, #00D4AA 0%, #00A884 100%);
+    padding: 22px 26px;
+    border-radius: 18px;
+    margin-bottom: 18px;
+    box-shadow: 0 6px 22px rgba(0,212,170,0.22);
+    text-align: center;
+">
+    <div style="color:#0E1117; font-size:2.4rem; font-weight:900; letter-spacing:-0.5px; font-family:'Segoe UI', sans-serif;">
+        🐾 Ravi's Pet Shop
+    </div>
+    <div style="color:#10231F; font-size:1rem; font-weight:700; margin-top:4px; font-family:'Segoe UI', sans-serif;">
+        Dashboard de Banho, Tosa e Serviços Extras
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 c_h1, c_h2 = st.columns([3, 1])
 with c_h1:
-    st.markdown('<p class="header-title">🐾 SERVICOS / BANHO E TOSA</p>', unsafe_allow_html=True)
+    st.markdown('<p class="header-title">SERVIÇOS / BANHO E TOSA</p>', unsafe_allow_html=True)
     st.markdown('<p class="header-sub">Acompanhe o desempenho de banhos, tosas e servicos extras</p>', unsafe_allow_html=True)
 with c_h2:
     min_d = df_f['Data'].min()
