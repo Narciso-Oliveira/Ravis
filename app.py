@@ -278,7 +278,8 @@ prof_sel = []
 cli_sel = []
 
 # Botao sempre visivel, dentro do corpo principal do dashboard
-col_btn_seta, col_btn_config, col_status_config, col_espaco_config = st.columns([0.45, 1.8, 2.4, 4])
+# Inclui um atalho direto para a pagina Financeiro, sem depender do menu lateral nativo.
+col_btn_seta, col_btn_config, col_btn_financeiro, col_status_config, col_espaco_config = st.columns([0.45, 1.8, 1.6, 2.4, 3.2])
 
 with col_btn_seta:
     st.button(
@@ -296,6 +297,13 @@ with col_btn_config:
         use_container_width=True,
         on_click=alternar_configuracoes
     )
+
+with col_btn_financeiro:
+    if st.button("💰 Financeiro", key="botao_ir_financeiro", use_container_width=True):
+        try:
+            st.switch_page("pages/2_Financeiro.py")
+        except Exception:
+            st.warning("Não consegui abrir automaticamente. Confira se existe o arquivo pages/2_Financeiro.py e atualize o Streamlit se necessário.")
 
 with col_status_config:
     st.caption("Configurações abertas" if st.session_state['mostrar_config'] else "Configurações fechadas")
