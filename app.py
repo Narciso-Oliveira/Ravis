@@ -253,17 +253,18 @@ if df_raw.empty:
 df_serv = df_raw[df_raw['Classificação'].isin(['Banho', 'Serviços extras'])].copy()
 
 # ============================================================
-# SIDEBAR / CONFIGURACOES
+# CONFIGURACOES NO TOPO DO DASHBOARD
 # ============================================================
+# Nao usa mais st.sidebar, porque a sidebar nativa do Streamlit pode ser recolhida
+# pelo navegador e desaparecer. Agora as configuracoes ficam dentro do proprio dash.
+
 meses = sorted(df_serv['Mes_Ano'].dropna().unique())
 profissionais = sorted(df_serv['Profissional'].dropna().unique())
 clientes = sorted(df_serv['Cliente'].dropna().unique())
 
-# Inicializa o estado das configuracoes
 if 'mostrar_config' not in st.session_state:
-    st.session_state['mostrar_config'] = True
+    st.session_state['mostrar_config'] = False
 
-# Funcao do botao: abre/fecha as configuracoes
 def alternar_configuracoes():
     st.session_state['mostrar_config'] = not st.session_state['mostrar_config']
 
@@ -276,41 +277,68 @@ tipos = ['Avulso', 'Pacote']
 prof_sel = []
 cli_sel = []
 
-# Botao sempre visivel no topo do dashboard
-col_btn_config, col_status_config, col_espaco_config = st.columns([1.4, 2.2, 4])
+# Botao sempre visivel, dentro do corpo principal do dashboard
+col_btn_seta, col_btn_config, col_status_config, col_espaco_config = st.columns([0.45, 1.8, 2.4, 4])
+
+with col_btn_seta:
+    st.button(
+        "«" if st.session_state['mostrar_config'] else "»",
+        key="botao_seta_configuracoes",
+        help="Abrir ou fechar painel de configuracoes",
+        use_container_width=True,
+        on_click=alternar_configuracoes
+    )
+
 with col_btn_config:
     st.button(
-        "🔒 Fechar configurações" if st.session_state['mostrar_config'] else "⚙️ Abrir configurações",
+        "Fechar configurações" if st.session_state['mostrar_config'] else "Abrir configurações",
         key="botao_toggle_configuracoes",
         use_container_width=True,
         on_click=alternar_configuracoes
     )
 
 with col_status_config:
-    if st.session_state['mostrar_config']:
-        st.caption("Configurações abertas")
-    else:
-        st.caption("Configurações fechadas")
+    st.caption("Configurações abertas" if st.session_state['mostrar_config'] else "Configurações fechadas")
 
-# Conteudo da sidebar
-with st.sidebar:
-    st.markdown("## 🐾 Painel de Controle")
+# Painel de configuracoes dentro do dashboard, sem depender da sidebar
+if st.session_state['mostrar_config']:
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #1B1F2B 0%, #1E2235 100%);
+        border-radius: 16px;
+        padding: 18px 22px;
+        margin: 10px 0 22px 0;
+        border-left: 5px solid #00D4AA;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.28);
+    ">
+        <div style="color:#00D4AA; font-size:1.1rem; font-weight:800; margin-bottom:4px;">
+            🐾 Painel de Controle
+        </div>
+        <div style="color:#9CA3AF; font-size:0.85rem; font-weight:500;">
+            Ajuste metas, capacidade, período e filtros do dashboard.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    if st.session_state['mostrar_config']:
-        with st.expander("⚙️ Capacidade e Metas", expanded=True):
-            cap_diaria = st.number_input("Capacidade diaria de banhos", min_value=1, value=15, step=1)
-            meta_banhos = st.number_input("Meta mensal de banhos", min_value=0, value=340, step=10)
-            meta_extras = st.number_input("Meta mensal de serviços extras", min_value=0, value=300, step=10)
-        
-        with st.expander("📅 Periodo", expanded=True):
-            meses_sel = st.multiselect("Meses", meses, default=meses)
-        
-        with st.expander("🔍 Detalhamento", expanded=False):
-            tipos = st.multiselect("Tipo de Banho", ['Avulso', 'Pacote'], default=['Avulso', 'Pacote'])
-            prof_sel = st.multiselect("Profissional", profissionais, default=[])
-            cli_sel = st.multiselect("Cliente", clientes, default=[])
-    else:
-        st.info("Configurações fechadas. Use o botão no topo do dashboard para abrir novamente.")
+    cfg1, cfg2, cfg3 = st.columns([1, 1, 1])
+
+    with cfg1:
+        st.markdown("#### ⚙️ Capacidade e Metas")
+        cap_diaria = st.number_input("Capacidade diaria de banhos", min_value=1, value=15, step=1)
+        meta_banhos = st.number_input("Meta mensal de banhos", min_value=0, value=340, step=10)
+        meta_extras = st.number_input("Meta mensal de serviços extras", min_value=0, value=300, step=10)
+
+    with cfg2:
+        st.markdown("#### 📅 Período")
+        meses_sel = st.multiselect("Meses", meses, default=meses)
+
+    with cfg3:
+        st.markdown("#### 🔍 Detalhamento")
+        tipos = st.multiselect("Tipo de Banho", ['Avulso', 'Pacote'], default=['Avulso', 'Pacote'])
+        prof_sel = st.multiselect("Profissional", profissionais, default=[])
+        cli_sel = st.multiselect("Cliente", clientes, default=[])
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
 # ============================================================
 # APLICAR FILTROS
