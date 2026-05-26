@@ -1710,7 +1710,7 @@ if st.session_state["mostrar_config_financeiro"]:
         """
         <div class="config-panel">
             <div class="title">💸 Painel Financeiro</div>
-            <div class="subtitle">Ajuste período, filtros e premissas manuais. Os custos podem vir pré-preenchidos pelo export, mas continuam editáveis.</div>
+            <div class="subtitle">Escolha o período e revise as premissas financeiras usadas nos cálculos. Quando houver dados no export ou no apoio financeiro, o dashboard sugere valores iniciais, mas você pode editar tudo antes da análise.</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1764,9 +1764,27 @@ if st.session_state["mostrar_config_financeiro"]:
 
     defaults = calcular_defaults_financeiros(apoio_df, export_df, df_raw, meses_sel)
 
-    st.markdown("#### ⚙️ Premissas financeiras manuais")
-    st.caption(
-        f"Valores mensais. Para períodos com mais de um mês, o dashboard multiplica estes valores pelo número de meses selecionados. Origem inicial: {defaults['origem_defaults']}."
+    st.markdown("#### ⚙️ Premissas financeiras do mês")
+    st.markdown(
+        f"""
+        <div style="
+            background: linear-gradient(135deg, #141824 0%, #1B1F2B 100%);
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin: 6px 0 14px 0;
+            border-left: 4px solid #00D4AA;
+            color: #D1D5DB;
+            font-size: 0.92rem;
+            line-height: 1.45;
+            font-weight: 600;
+        ">
+            Informe aqui os valores de referência para <b>1 mês</b>.<br>
+            Se selecionar vários meses, o dashboard replica esses valores para cada mês do período.
+            Exemplo: custo fixo mensal de R$ 10.000 em 3 meses entra como R$ 30.000 no cálculo.<br>
+            <span style="color:#9CA3AF;">Valores sugeridos inicialmente por: <b>{defaults['origem_defaults']}</b>. Todos os campos continuam editáveis.</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     inp1, inp2, inp3, inp4 = st.columns(4)
