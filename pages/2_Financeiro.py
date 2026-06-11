@@ -1663,7 +1663,7 @@ if "mostrar_config_financeiro" not in st.session_state:
 def alternar_config_financeiro():
     st.session_state["mostrar_config_financeiro"] = not st.session_state["mostrar_config_financeiro"]
 
-col_btn_seta, col_btn_config, col_status_config, col_espaco_config = st.columns([0.45, 1.8, 2.4, 4])
+col_btn_seta, col_btn_config, col_btn_voltar, col_status_config, col_espaco_config = st.columns([0.45, 1.8, 1.6, 2.4, 2.4])
 
 with col_btn_seta:
     st.button(
@@ -1681,6 +1681,13 @@ with col_btn_config:
         use_container_width=True,
         on_click=alternar_config_financeiro,
     )
+
+with col_btn_voltar:
+    if st.button("🏠 Home", key="botao_ir_servicos", use_container_width=True):
+        try:
+            st.switch_page("app.py")
+        except Exception:
+            st.warning("Verifique o nome do arquivo principal (app.py).")
 
 with col_status_config:
     origem_export = "com export" if files_info.get("export_path") else "sem export"
@@ -1710,7 +1717,7 @@ if st.session_state["mostrar_config_financeiro"]:
         """
         <div class="config-panel">
             <div class="title">💸 Painel Financeiro</div>
-            <div class="subtitle">Escolha o período e revise as premissas financeiras usadas nos cálculos. Quando houver dados no export ou no apoio financeiro, o dashboard sugere valores iniciais, mas você pode editar tudo antes da análise.</div>
+            <div class="subtitle">Ajuste período, filtros e premissas manuais. Os custos podem vir pré-preenchidos pelo export, mas continuam editáveis.</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1764,27 +1771,9 @@ if st.session_state["mostrar_config_financeiro"]:
 
     defaults = calcular_defaults_financeiros(apoio_df, export_df, df_raw, meses_sel)
 
-    st.markdown("#### ⚙️ Premissas financeiras do mês")
-    st.markdown(
-        f"""
-        <div style="
-            background: linear-gradient(135deg, #141824 0%, #1B1F2B 100%);
-            border-radius: 12px;
-            padding: 14px 18px;
-            margin: 6px 0 14px 0;
-            border-left: 4px solid #00D4AA;
-            color: #D1D5DB;
-            font-size: 0.92rem;
-            line-height: 1.45;
-            font-weight: 600;
-        ">
-            Informe aqui os valores de referência para <b>1 mês</b>.<br>
-            Se selecionar vários meses, o dashboard replica esses valores para cada mês do período.
-            Exemplo: custo fixo mensal de R$ 10.000 em 3 meses entra como R$ 30.000 no cálculo.<br>
-            <span style="color:#9CA3AF;">Valores sugeridos inicialmente por: <b>{defaults['origem_defaults']}</b>. Todos os campos continuam editáveis.</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.markdown("#### ⚙️ Premissas financeiras manuais")
+    st.caption(
+        f"Valores mensais. Para períodos com mais de um mês, o dashboard multiplica estes valores pelo número de meses selecionados. Origem inicial: {defaults['origem_defaults']}."
     )
 
     inp1, inp2, inp3, inp4 = st.columns(4)
