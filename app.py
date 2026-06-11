@@ -222,6 +222,24 @@ def get_extra_type(service_name):
     if 'Corte de Unhas' in s: return 'Corte de unhas'
     return 'Outro'
 
+def get_servico_banho_hidratacao(service_name):
+    # Retorna apenas servicos de Banho ou Hidratacao, removendo codigo inicial quando houver.
+    if pd.isna(service_name):
+        return ''
+
+    s = str(service_name).strip()
+    if not s:
+        return ''
+
+    # Remove apenas codigo numerico no inicio, exemplo: "1-Banho Porte P Pelo Longo".
+    s_sem_codigo = re.sub(r'^\s*\d+\s*-\s*', '', s).strip()
+    s_lower = s_sem_codigo.lower()
+
+    if s_lower.startswith('banho') or s_lower.startswith('hidratacao') or s_lower.startswith('hidratação'):
+        return s_sem_codigo
+
+    return ''
+
 # ============================================================
 # CARREGAR DADOS
 # ============================================================
@@ -230,7 +248,11 @@ def load_data():
     # Tenta encontrar o arquivo
     for path in ['tabela geral.xlsx', 'data/tabela geral.xlsx']:
         if os.path.exists(path):
-            df = pd.read_excel(path, engine='openpyxl')
+            # Usa a aba Planilha1 da tabela geral.
+            try:
+                df = pd.read_excel(path, sheet_name='Planilha1', engine='openpyxl')
+            except ValueError:
+                df = pd.read_excel(path, engine='openpyxl')
             break
     else:
         st.error("Arquivo 'tabela geral.xlsx' nao encontrado.")
@@ -242,6 +264,12 @@ def load_data():
     
     # Garantir numerico
     df['Valor Faturado'] = pd.to_numeric(df['Valor Faturado'], errors='coerce').fillna(0)
+
+    # Coluna usada no filtro: so preenche Banho e Hidratacao; demais ficam em branco.
+    if 'Servico Banho Hidratacao' not in df.columns:
+        df['Servico Banho Hidratacao'] = df['Servico/Produto'].apply(get_servico_banho_hidratacao)
+    else:
+        df['Servico Banho Hidratacao'] = df['Servico Banho Hidratacao'].fillna('').astype(str).str.strip()
     
     return df
 
@@ -261,6 +289,12 @@ df_serv = df_raw[df_raw['Classificação'].isin(['Banho', 'Serviços extras'])].
 meses = sorted(df_serv['Mes_Ano'].dropna().unique())
 profissionais = sorted(df_serv['Profissional'].dropna().unique())
 clientes = sorted(df_serv['Cliente'].dropna().unique())
+servicos_lista = sorted(df_serv['Servico Banho Hidratacao'].dropna().unique())
+servicos_banho_hidratacao = sorted(
+    df_serv.loc[df_serv['Servico Banho Hidratacao'].astype(str).str.strip() != '', 'Servico Banho Hidratacao']
+    .dropna()
+    .unique()
+)
 
 if 'mostrar_config' not in st.session_state:
     st.session_state['mostrar_config'] = False
@@ -274,8 +308,10 @@ meta_banhos = 340
 meta_extras = 300
 meses_sel = meses
 tipos = ['Avulso', 'Pacote']
+servico_banho_hid_sel = []
 prof_sel = []
 cli_sel = []
+serv_sel = []
 
 # Botao sempre visivel, dentro do corpo principal do dashboard
 # Inclui um atalho direto para a pagina Financeiro, sem depender do menu lateral nativo.
@@ -343,8 +379,14 @@ if st.session_state['mostrar_config']:
     with cfg3:
         st.markdown("#### 🔍 Detalhamento")
         tipos = st.multiselect("Tipo de Banho", ['Avulso', 'Pacote'], default=['Avulso', 'Pacote'])
+        servico_banho_hid_sel = st.multiselect(
+            "Servico Banho Hidratacao",
+            servicos_banho_hidratacao,
+            default=[]
+        )
         prof_sel = st.multiselect("Profissional", profissionais, default=[])
         cli_sel = st.multiselect("Cliente", clientes, default=[])
+        serv_sel = st.multiselect("Serviço (Produto)", servicos_lista, default=[])
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -356,10 +398,15 @@ if meses_sel:
     df_f = df_f[df_f['Mes_Ano'].isin(meses_sel)]
 if tipos:
     df_f = df_f[df_f['Tipo Banho'].isin(tipos)]
+if servico_banho_hid_sel:
+    df_f = df_f[df_f['Servico Banho Hidratacao'].isin(servico_banho_hid_sel)]
 if prof_sel:
     df_f = df_f[df_f['Profissional'].isin(prof_sel)]
 if cli_sel:
-    df_f = df_f[df_f['Cliente'].isin(cli_sel)]
+    df_f = df_f[df_f['Cliente'].isin(cli_sel)]   
+if serv_sel:                                                    
+    df_f = df_f[df_f['Servico Banho Hidratacao'].isin(serv_sel)]   
+
 
 # ============================================================
 # METRICAS
@@ -801,6 +848,140 @@ with cr2:
         fig_oc.add_hline(y=100, line_dash="dash", line_color="#FF5252", annotation_text="100%",
                          annotation_font_color="#FF5252")
         st.plotly_chart(fig_oc, use_container_width=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ============================================================
+# ROW: DIAS DE PICO (Estilo Google Popular Times)
+# ============================================================
+st.markdown("### 📊 DIAS DE PICO")
+
+mov_dia = df_f.groupby('Data').size().reset_index(name='Atendimentos')
+mov_dia = mov_dia.dropna(subset=['Data']).sort_values('Data')
+mov_dia['Mes_Ano'] = mov_dia['Data'].dt.to_period('M').astype(str)
+
+meses_disp = sorted(mov_dia['Mes_Ano'].unique())
+
+if meses_disp:
+    mes_escolhido = st.selectbox(
+        "📅 Mês",
+        meses_disp,
+        format_func=lambda x: nome_mes(x).capitalize() + ' ' + x.split('-')[0],
+        index=len(meses_disp) - 1,
+        key='mes_pico'
+    )
+
+    dm = mov_dia[mov_dia['Mes_Ano'] == mes_escolhido].copy()
+
+    if not dm.empty:
+        dm['Dia_Num'] = dm['Data'].dt.day
+        pico_val = dm['Atendimentos'].max()
+        media_val = dm['Atendimentos'].mean()
+        dia_pico_row = dm.loc[dm['Atendimentos'].idxmax()]
+        dias_ativos = len(dm)
+
+        # --- KPIs do movimento ---
+        cp1, cp2, cp3 = st.columns(3)
+        with cp1:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <h4>🔴 Dia de Pico</h4>
+                <p class="value">Dia {int(dia_pico_row['Dia_Num'])}</p>
+                <p class="sub">{int(pico_val)} atendimentos</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with cp2:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <h4>📊 Média Diária</h4>
+                <p class="value">{media_val:.1f}</p>
+                <p class="sub">atendimentos / dia</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with cp3:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <h4>📅 Dias com Movimento</h4>
+                <p class="value">{dias_ativos}</p>
+                <p class="sub">dias ativos no mês</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # --- Cores estilo Google Popular Times ---
+        cores = []
+        for _, row in dm.iterrows():
+            ratio = row['Atendimentos'] / pico_val if pico_val > 0 else 0
+            if row['Atendimentos'] == pico_val:
+                cores.append('#E53935')       # vermelho = dia de pico
+            elif ratio >= 0.75:
+                cores.append('#5C6BC0')       # azul forte = dia forte
+            elif ratio >= 0.50:
+                cores.append('#78909C')       # cinza medio
+            else:
+                cores.append('#B0BEC5')       # cinza claro = dia fraco
+
+        # --- Gráfico ---
+        fig_pico = go.Figure()
+
+        fig_pico.add_trace(go.Bar(
+            x=[str(d) for d in dm['Dia_Num']],
+            y=dm['Atendimentos'],
+            marker=dict(color=cores, cornerradius=5),
+            text=dm['Atendimentos'],
+            textposition='outside',
+            textfont=dict(color='#7B8194', size=9),
+            hovertemplate='Dia %{x}<br>%{y} atendimentos<extra></extra>',
+            cliponaxis=False
+        ))
+
+        # Linha da média
+        fig_pico.add_hline(
+            y=media_val,
+            line_dash="dot",
+            line_color="#00D4AA",
+            line_width=1.5,
+            annotation_text=f"Média: {media_val:.0f}",
+            annotation_position="top right",
+            annotation_font_color="#00D4AA",
+            annotation_font_size=11
+        )
+
+        fig_pico.update_layout(
+            plot_bgcolor='#1B1F2B',
+            paper_bgcolor='#1B1F2B',
+            font=dict(color='#9CA3AF', size=11),
+            height=320,
+            xaxis=dict(
+                showgrid=False,
+                tickfont=dict(size=10, color='#7B8194'),
+                title=dict(text='Dia do mês', font=dict(size=11, color='#7B8194')),
+                type='category'
+            ),
+            yaxis=dict(
+                showgrid=False,
+                showticklabels=False,
+                range=[0, pico_val * 1.3]
+            ),
+            margin=dict(l=10, r=20, t=15, b=50),
+            bargap=0.18
+        )
+
+        st.plotly_chart(fig_pico, use_container_width=True)
+
+        # --- Legenda visual ---
+        st.markdown("""
+        <div style="display:flex; gap:18px; justify-content:center; margin-top:4px;">
+            <span style="color:#E53935; font-size:0.8rem; font-weight:700;">🔴 Pico</span>
+            <span style="color:#5C6BC0; font-size:0.8rem; font-weight:600;">🔵 Forte (≥75%)</span>
+            <span style="color:#78909C; font-size:0.8rem; font-weight:600;">⚪ Médio (≥50%)</span>
+            <span style="color:#B0BEC5; font-size:0.8rem; font-weight:600;">🩶 Fraco (<50%)</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    else:
+        st.info("Sem dados para o mês selecionado.")
+else:
+    st.info("Sem dados de movimento diário no período filtrado.")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
